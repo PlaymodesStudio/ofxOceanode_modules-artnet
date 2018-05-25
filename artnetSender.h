@@ -24,13 +24,46 @@ public:
     artnetSender();
     ~artnetSender();
     
+    void setup() override;
+    
+//    void saveParameterArrange(ofJson &json){
+//        vector<int> indexs;
+//        for(auto param : parameterVector) indexs.push_back(param.first);
+//        json["MultiPresetArrange"] = indexs;
+//    }
+//    
+//    void loadParameterArrange(ofJson &json){
+//        if(json.count("MultiPresetArrange") == 1){
+//            vector<int> indexs = json["MultiPresetArrange"];
+//            for(auto param : parameterVector){
+//                group->remove(param.second.getEscapedName());
+//                listeners.erase(param.first);
+//                ifNewCreatedChecker.erase(param.first);
+//            }
+//            parameterVector.clear();
+//            for(int i : indexs){
+//                parameterVector[i] = ofParameter<T>();
+//                parameterVector[i].set(baseParameter.getName() + " " + ofToString(i), baseParameter);
+//                ifNewCreatedChecker[i] = false;
+//                group->add(parameterVector[i]);
+//                listeners[i] = parameterVector[i].newListener([&, i](T &val){
+//                    inputListener(i);
+//                });
+//                ifNewCreatedChecker[i] = true;
+//            }
+//            ofNotifyEvent(parameterGroupChanged);
+//        }
+//    }
+    
 private:
+    void inputListener(int index);
+    
     ofxArtNet artnet;
     void sendArtnet(vector<float> &vf, int inputIndex);
     void sendPoll();
     void receivePollReply(ofxArtNetNodeEntry &node);
 
-    vector<ofEventListener> eventListeners;
+    ofEventListeners eventListeners;
     
     ofParameter<void>   pollButton;
     vector<ofParameter<vector<float>>>  inputs;
@@ -38,6 +71,13 @@ private:
     ofParameter<int> startUniverse;
     ofParameter<string> targetIp;
     vector<ofParameter<int>> universeChooser;
+    
+    
+    map<int, ofParameter<int>> universeMap;
+    map<int, ofParameter<vector<float>>> inputMap;
+    map<int, bool> ifNewCreatedChecker;
+    
+    map<int, ofEventListener> listeners;
     
     vector<string> nodeOptions;
     vector<nodeOptionStruct> nodeOptionStructs;

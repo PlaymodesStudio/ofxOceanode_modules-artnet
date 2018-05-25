@@ -8,34 +8,80 @@
 #include "artnetSender.h"
 
 artnetSender::artnetSender() : ofxOceanodeNodeModel("Artnet Sender"){
-    parameters->add(pollButton.set("Poll Devices"));
     
-    inputs.resize(1);
-    parameters->add(inputs[0].set("Input 0", {0}, {0}, {1}));
-    universeChooser.resize(1);
-    parameters->add(createDropdownAbstractParameter("Output 0", {""}, universeChooser[0]));
-    
-    
-    artnet.init();
-    artnet.setSubNet(0);
-    //Brodcast;
-//    artnet.setNodeType(ARTNET_TYPE_RAW);
-    artnet.setPortType(0, ARTNET_PORT_ENABLE_INPUT, ARTNET_DATA_DMX);
-    artnet.setPortAddress(0, ARTNET_PORT_INPUT, 0);
-    
-    eventListeners.push_back(artnet.pollReply.newListener(this, &artnetSender::receivePollReply));
-    artnet.start();
-    sendPoll();
-    
-    eventListeners.push_back(pollButton.newListener(this, &artnetSender::sendPoll));
-    eventListeners.push_back(inputs[0].newListener([&](vector<float> &vf){
-        sendArtnet(vf, 0);
-    }));
 }
 
 artnetSender::~artnetSender(){
-    artnet.stop();
-    artnet.close();
+    if(artnet.isRunning()){
+        artnet.stop();
+        artnet.close();
+    }
+}
+
+void artnetSender::setup(){
+    artnet.init();
+    artnet.setSubNet(0);
+    //Brodcast;
+    //    artnet.setNodeType(ARTNET_TYPE_RAW);
+    artnet.setPortType(0, ARTNET_PORT_ENABLE_INPUT, ARTNET_DATA_DMX);
+    artnet.setPortAddress(0, ARTNET_PORT_INPUT, 0);
+    
+    eventListeners.push(artnet.pollReply.newListener(this, &artnetSender::receivePollReply));
+    artnet.start();
+    sendPoll();
+    
+    
+    parameters->add(pollButton.set("Poll Devices"));
+    
+    universeMap[0] = ofParameter<int>();
+    parameters->add(createDropdownAbstractParameter("Output 0",  nodeOptions, universeMap[0]));
+    inputMap[0] = ofParameter<vector<float>>();
+    parameters->add(inputMap[0].set("Input 0", {-1}, {0}, {1}));
+    ifNewCreatedChecker[0] = false;
+    listeners[0] = inputMap[0].newListener([&](vector<float> &val){
+        inputListener(0);
+    });
+    
+    eventListeners.push(pollButton.newListener(this, &artnetSender::sendPoll));
+}
+
+void artnetSender::inputListener(int index){
+    if(inputMap[index].get()[0] != -1 && !ifNewCreatedChecker[index]){
+        int newCreatedIndex = -1;
+        for(int i = 0 ; newCreatedIndex == -1 ; i++){
+            if(inputMap.count(i) == 0){
+                newCreatedIndex = i;
+            }
+        }
+        universeMap[newCreatedIndex] = ofParameter<int>();
+        parameters->add(createDropdownAbstractParameter("Output " + ofToString(newCreatedIndex), nodeOptions, universeMap[newCreatedIndex]));
+        inputMap[newCreatedIndex] = ofParameter<vector<float>>();
+        parameters->add(inputMap[newCreatedIndex].set("Input " + ofToString(newCreatedIndex), {-1}, {0}, {1}));
+        ifNewCreatedChecker[newCreatedIndex] = false;
+        listeners[newCreatedIndex] = inputMap[newCreatedIndex].newListener([&, newCreatedIndex](vector<float> &val){
+            inputListener(newCreatedIndex);
+        });
+        ifNewCreatedChecker[index] = true;
+        ofNotifyEvent(parameterGroupChanged);
+    }
+    else if(inputMap[index].get()[0] == -1){
+        int removeIndex = -1;
+        for(auto param : inputMap){
+            if(param.second.get()[0] == -1 && param.first > removeIndex){
+                removeIndex = param.first;
+            }
+        }
+        parameters->remove(inputMap[removeIndex].getEscapedName());
+        parameters->remove("Output_" + ofToString(removeIndex) + "_Selector");
+        listeners.erase(removeIndex);
+        inputMap.erase(removeIndex);
+        universeMap.erase(removeIndex);
+        ifNewCreatedChecker.erase(removeIndex);
+        if(index != removeIndex){
+            ifNewCreatedChecker[index] = false;
+        }
+        ofNotifyEvent(parameterGroupChanged);
+    }
 }
 
 void artnetSender::sendArtnet(vector<float> &vf, int inputIndex){
@@ -68,13 +114,13 @@ void artnetSender::receivePollReply(ofxArtNetNodeEntry &node){
         cout<<node.getUniverseOutput(i)%16<<"-";
     }
     cout<<endl;
-    for(int i = 0 ; parameters->contains("Output " + ofToString(i)); i++){
+    for(int i = 0 ; parameters->contains("Output " + ofToString(i) + " Selector"); i++){
         string optionsString;
         for(auto opt : nodeOptions){
             optionsString += opt + "-|-";
         }
         optionsString.erase(optionsString.end()-3, optionsString.end());
-        string name = "Output " + ofToString(i);
+        string name = "Output " + ofToString(i) + " Selector";
         parameters->getGroup(name).getString(0).set(optionsString);
         parameters->getGroup(name).getInt(1).setMax(nodeOptions.size());
         ofNotifyEvent(dropdownChanged, name);

@@ -81,6 +81,17 @@ void artnetSender::inputListener(int index){
             ifNewCreatedChecker[index] = false;
         }
         ofNotifyEvent(parameterGroupChanged);
+    }else{
+        unsigned char data[inputMap[index].get().size()];
+        for(int i = 0; i < inputMap[index].get().size(); i++){
+            data[i] = inputMap[index].get()[i]  * 127;
+        }
+        
+        //Unicast
+        if(universeMap[index] != 0 && universeMap[index] < nodeOptionStructs.size()){
+            nodeOptionStruct option = nodeOptionStructs[universeMap[index]-1];
+            artnet.sendDmx_by_SU(0, option.subnet, option.universe, option.ip.data(), data, 512);
+        }
     }
 }
 

@@ -27,8 +27,8 @@ void artnetSender::setup(){
     artnet.setPortAddress(0, ARTNET_PORT_INPUT, 0);
     
     eventListeners.push(artnet.pollReply.newListener(this, &artnetSender::receivePollReply));
-    //artnet.start();
-    //sendPoll();
+    artnet.start();
+    sendPoll();
     nodeOptions.clear();
     nodeOptions.push_back("None");
     
@@ -96,7 +96,7 @@ void artnetSender::inputListener(int index){
         }
     }else{
         for(int i = 0 ; parameters->contains("Output " + ofToString(i) + " Selector"); i++){
-            string optionsString = "None";
+            string optionsString;
             for(auto opt : nodeOptions){
                 optionsString += opt + "-|-";
             }

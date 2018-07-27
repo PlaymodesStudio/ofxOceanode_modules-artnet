@@ -86,7 +86,7 @@ void artnetSender::inputListener(int index){
     }else if(!isPoll){
         unsigned char data[inputMap[index].get().size()];
         for(int i = 0; i < inputMap[index].get().size(); i++){
-            data[i] = inputMap[index].get()[i]  * 127;
+            data[i] = inputMap[index].get()[i]  * 255;
         }
         
         //Unicast

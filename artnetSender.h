@@ -26,34 +26,40 @@ public:
     
     void setup() override;
     
-//    void saveParameterArrange(ofJson &json){
-//        vector<int> indexs;
-//        for(auto param : parameterVector) indexs.push_back(param.first);
-//        json["MultiPresetArrange"] = indexs;
-//    }
-//    
-//    void loadParameterArrange(ofJson &json){
-//        if(json.count("MultiPresetArrange") == 1){
-//            vector<int> indexs = json["MultiPresetArrange"];
-//            for(auto param : parameterVector){
-//                group->remove(param.second.getEscapedName());
-//                listeners.erase(param.first);
-//                ifNewCreatedChecker.erase(param.first);
-//            }
-//            parameterVector.clear();
-//            for(int i : indexs){
-//                parameterVector[i] = ofParameter<T>();
-//                parameterVector[i].set(baseParameter.getName() + " " + ofToString(i), baseParameter);
-//                ifNewCreatedChecker[i] = false;
-//                group->add(parameterVector[i]);
-//                listeners[i] = parameterVector[i].newListener([&, i](T &val){
-//                    inputListener(i);
-//                });
-//                ifNewCreatedChecker[i] = true;
-//            }
-//            ofNotifyEvent(parameterGroupChanged);
-//        }
-//    }
+    virtual void presetSave(ofJson &json) override{
+        vector<int> indexs;
+        for(auto param : universeMap) indexs.push_back(param.first);
+        json["Inputs"] = indexs;
+    }
+    
+    virtual void presetRecallBeforeSettingParameters(ofJson &json) override{
+        if(json.count("Inputs") == 1){
+            vector<int> indexs = json["Inputs"];
+            for(auto param : inputMap){
+                parameters->remove(param.second.getEscapedName());
+                parameters->remove("Output_" + ofToString(param.first) + "_Selector");
+                listeners.erase(param.first);
+                ifNewCreatedChecker.erase(param.first);
+            }
+            for(auto param : universeMap){
+                parameters->remove(param.second.getEscapedName());
+            }
+            universeMap.clear();
+            inputMap.clear();
+            ofNotifyEvent(parameterGroupChanged);
+            for(int i : indexs){
+                universeMap[i] = ofParameter<int>();
+                parameters->add(createDropdownAbstractParameter("Output " + ofToString(i), nodeOptions, universeMap[i]));
+                inputMap[i] = ofParameter<vector<float>>();
+                addParameterToGroupAndInfo(inputMap[i].set("Input " + ofToString(i), {-1}, {0}, {1})).isSavePreset = false;
+                ifNewCreatedChecker[i] = true;
+                listeners[i] = inputMap[i].newListener([&, i](vector<float> &val){
+                    inputListener(i);
+                });
+            }
+            ofNotifyEvent(parameterGroupChanged);
+        }
+    }
     
 private:
     void inputListener(int index);
@@ -81,6 +87,8 @@ private:
     
     vector<string> nodeOptions;
     vector<nodeOptionStruct> nodeOptionStructs;
+    
+    bool isPoll;
 };
 
 #endif /* artnetSender_h */

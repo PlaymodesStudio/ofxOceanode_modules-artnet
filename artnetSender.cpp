@@ -8,7 +8,7 @@
 #include "artnetSender.h"
 
 artnetSender::artnetSender() : ofxOceanodeNodeModel("Artnet Sender"){
-    
+    isPoll = false;
 }
 
 artnetSender::~artnetSender(){
@@ -27,8 +27,10 @@ void artnetSender::setup(){
     artnet.setPortAddress(0, ARTNET_PORT_INPUT, 0);
     
     eventListeners.push(artnet.pollReply.newListener(this, &artnetSender::receivePollReply));
-    artnet.start();
-    sendPoll();
+    //artnet.start();
+    //sendPoll();
+    nodeOptions.clear();
+    nodeOptions.push_back("None");
     
     
     parameters->add(pollButton.set("Poll Devices"));
@@ -36,7 +38,7 @@ void artnetSender::setup(){
     universeMap[0] = ofParameter<int>();
     parameters->add(createDropdownAbstractParameter("Output 0",  nodeOptions, universeMap[0]));
     inputMap[0] = ofParameter<vector<float>>();
-    parameters->add(inputMap[0].set("Input 0", {-1}, {0}, {1}));
+    addParameterToGroupAndInfo(inputMap[0].set("Input 0", {-1}, {0}, {1})).isSavePreset = false;
     ifNewCreatedChecker[0] = false;
     listeners[0] = inputMap[0].newListener([&](vector<float> &val){
         inputListener(0);
@@ -56,7 +58,7 @@ void artnetSender::inputListener(int index){
         universeMap[newCreatedIndex] = ofParameter<int>();
         parameters->add(createDropdownAbstractParameter("Output " + ofToString(newCreatedIndex), nodeOptions, universeMap[newCreatedIndex]));
         inputMap[newCreatedIndex] = ofParameter<vector<float>>();
-        parameters->add(inputMap[newCreatedIndex].set("Input " + ofToString(newCreatedIndex), {-1}, {0}, {1}));
+        addParameterToGroupAndInfo(inputMap[newCreatedIndex].set("Input " + ofToString(newCreatedIndex), {-1}, {0}, {1})).isSavePreset = false;
         ifNewCreatedChecker[newCreatedIndex] = false;
         listeners[newCreatedIndex] = inputMap[newCreatedIndex].newListener([&, newCreatedIndex](vector<float> &val){
             inputListener(newCreatedIndex);
@@ -81,7 +83,7 @@ void artnetSender::inputListener(int index){
             ifNewCreatedChecker[index] = false;
         }
         ofNotifyEvent(parameterGroupChanged);
-    }else{
+    }else if(!isPoll){
         unsigned char data[inputMap[index].get().size()];
         for(int i = 0; i < inputMap[index].get().size(); i++){
             data[i] = inputMap[index].get()[i]  * 127;
@@ -92,6 +94,19 @@ void artnetSender::inputListener(int index){
             nodeOptionStruct option = nodeOptionStructs[universeMap[index]-1];
             artnet.sendDmx_by_SU(0, option.subnet, option.universe, option.ip.data(), data, 512);
         }
+    }else{
+        for(int i = 0 ; parameters->contains("Output " + ofToString(i) + " Selector"); i++){
+            string optionsString = "None";
+            for(auto opt : nodeOptions){
+                optionsString += opt + "-|-";
+            }
+            optionsString.erase(optionsString.end()-3, optionsString.end());
+            string name = "Output " + ofToString(i) + " Selector";
+            parameters->getGroup(name).getString(0).set(optionsString);
+            parameters->getGroup(name).getInt(1).setMax(nodeOptions.size());
+            ofNotifyEvent(dropdownChanged, name);
+        }
+        isPoll = false;
     }
 }
 
@@ -112,12 +127,16 @@ void artnetSender::sendArtnet(vector<float> &vf, int inputIndex){
 }
 
 void artnetSender::sendPoll(){
+    if(!artnet.isRunning()){
+        artnet.start();
+    }
     artnet.sendPoll();
     nodeOptions.clear();
     nodeOptions.push_back("None");
 };
 
 void artnetSender::receivePollReply(ofxArtNetNodeEntry &node){
+    isPoll = true;
     cout<<"NODE FOUND! " << "IP: " <<node.getIp()<< " - Subnet: "<<node.getSubnet()<<" Universes: -" ;
     for(int i = 0; i < node.getPortCount(); i++){
         nodeOptionStructs.push_back(nodeOptionStruct(node.getSubnet(), node.getUniverseOutput(i)%16, node.getIp()));
@@ -125,16 +144,16 @@ void artnetSender::receivePollReply(ofxArtNetNodeEntry &node){
         cout<<node.getUniverseOutput(i)%16<<"-";
     }
     cout<<endl;
-    for(int i = 0 ; parameters->contains("Output " + ofToString(i) + " Selector"); i++){
-        string optionsString;
-        for(auto opt : nodeOptions){
-            optionsString += opt + "-|-";
-        }
-        optionsString.erase(optionsString.end()-3, optionsString.end());
-        string name = "Output " + ofToString(i) + " Selector";
-        parameters->getGroup(name).getString(0).set(optionsString);
-        parameters->getGroup(name).getInt(1).setMax(nodeOptions.size());
-        ofNotifyEvent(dropdownChanged, name);
-    }
+//    for(int i = 0 ; parameters->contains("Output " + ofToString(i) + " Selector"); i++){
+//        string optionsString;
+//        for(auto opt : nodeOptions){
+//            optionsString += opt + "-|-";
+//        }
+//        optionsString.erase(optionsString.end()-3, optionsString.end());
+//        string name = "Output " + ofToString(i) + " Selector";
+//        parameters->getGroup(name).getString(0).set(optionsString);
+//        parameters->getGroup(name).getInt(1).setMax(nodeOptions.size());
+//        ofNotifyEvent(dropdownChanged, name);
+//    }
 }
 

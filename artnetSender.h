@@ -47,6 +47,7 @@ public:
             universeMap.clear();
             inputMap.clear();
             ofNotifyEvent(parameterGroupChanged);
+            int maxIndex = 0;
             for(int i : indexs){
                 universeMap[i] = ofParameter<int>();
                 parameters->add(createDropdownAbstractParameter("Output " + ofToString(i), nodeOptions, universeMap[i]));
@@ -56,8 +57,10 @@ public:
                 listeners[i] = inputMap[i].newListener([&, i](vector<float> &val){
                     inputListener(i);
                 });
+                if(i > maxIndex) maxIndex = i;
             }
             ofNotifyEvent(parameterGroupChanged);
+            ifNewCreatedChecker[maxIndex] = false;
         }
     }
     

@@ -30,11 +30,19 @@ public:
         vector<int> indexs;
         for(auto param : universeMap) indexs.push_back(param.first);
         json["Inputs"] = indexs;
+        
+        vector<string> outputNode;
+        outputNode.resize(*max_element(indexs.begin(), indexs.end())+1);
+        for(auto param : universeMap){
+            outputNode[param.first] = nodeOptions[param.second];
+        }
+        json["outputNode"] = outputNode;
     }
     
     virtual void presetRecallBeforeSettingParameters(ofJson &json) override{
         if(json.count("Inputs") == 1){
             vector<int> indexs = json["Inputs"];
+           
             for(auto param : inputMap){
                 parameters->remove(param.second.getEscapedName());
                 parameters->remove("Output_" + ofToString(param.first) + "_Selector");
@@ -50,7 +58,7 @@ public:
             int maxIndex = 0;
             for(int i : indexs){
                 universeMap[i] = ofParameter<int>();
-                parameters->add(createDropdownAbstractParameter("Output " + ofToString(i), nodeOptions, universeMap[i]));
+                addParameterToGroupAndInfo(createDropdownAbstractParameter("Output " + ofToString(i), nodeOptions, universeMap[i])).isSavePreset = false;
                 inputMap[i] = ofParameter<vector<float>>();
                 addParameterToGroupAndInfo(inputMap[i].set("Input " + ofToString(i), {-1}, {0}, {1})).isSavePreset = false;
                 ifNewCreatedChecker[i] = true;
@@ -61,6 +69,16 @@ public:
             }
             ofNotifyEvent(parameterGroupChanged);
             ifNewCreatedChecker[maxIndex] = false;
+            
+            if(json.count("outputNode") == 1){
+                vector<string> outputNode = json["outputNode"];
+                for(auto i : indexs){
+                    ptrdiff_t pos = find(nodeOptions.begin(), nodeOptions.end(), outputNode[i]) - nodeOptions.begin();
+                    if(pos < nodeOptions.size()) {
+                        universeMap[i] = pos;
+                    }
+                }
+            }
         }
     }
     

@@ -36,7 +36,7 @@ void artnetSender::setup(){
     parameters->add(pollButton.set("Poll Devices"));
     
     universeMap[0] = ofParameter<int>();
-    parameters->add(createDropdownAbstractParameter("Output 0",  nodeOptions, universeMap[0]));
+    addParameterToGroupAndInfo(createDropdownAbstractParameter("Output 0",  nodeOptions, universeMap[0])).isSavePreset = false;
     inputMap[0] = ofParameter<vector<float>>();
     addParameterToGroupAndInfo(inputMap[0].set("Input 0", {-1}, {0}, {1})).isSavePreset = false;
     ifNewCreatedChecker[0] = false;

@@ -35,66 +35,60 @@ void artnetSender::setup(){
     
     parameters->add(pollButton.set("Poll Devices"));
     
-    universeMap[0] = ofParameter<int>();
-    addParameterToGroupAndInfo(createDropdownAbstractParameter("Output 0",  nodeOptions, universeMap[0])).isSavePreset = false;
-    inputMap[0] = ofParameter<vector<float>>();
-    addParameterToGroupAndInfo(inputMap[0].set("Input 0", {-1}, {0}, {1})).isSavePreset = false;
-    ifNewCreatedChecker[0] = false;
-    listeners[0] = inputMap[0].newListener([&](vector<float> &val){
-        inputListener(0);
-    });
+    int numInputs = 4;
+    
+    for(int i = 0; i < numInputs; i++){
+        universeMap[i] = ofParameter<int>();
+        addParameterToGroupAndInfo(createDropdownAbstractParameter("Output " + ofToString(i), nodeOptions, universeMap[i])).isSavePreset = false;
+        inputMap[i] = ofParameter<vector<float>>();
+        addParameterToGroupAndInfo(inputMap[i].set("Input " + ofToString(i), {-1}, {0}, {1})).isSavePreset = false;
+        ifNewCreatedChecker[i] = true;
+        listeners[i] = inputMap[i].newListener([&, i](vector<float> &val){
+            inputListener(i);
+        });
+    }
     
     eventListeners.push(pollButton.newListener(this, &artnetSender::sendPoll));
 }
 
 void artnetSender::inputListener(int index){
-    if(inputMap[index].get()[0] != -1 && !ifNewCreatedChecker[index]){
-        int newCreatedIndex = -1;
-        for(int i = 0 ; newCreatedIndex == -1 ; i++){
-            if(inputMap.count(i) == 0){
-                newCreatedIndex = i;
-            }
-        }
-        universeMap[newCreatedIndex] = ofParameter<int>();
-        parameters->add(createDropdownAbstractParameter("Output " + ofToString(newCreatedIndex), nodeOptions, universeMap[newCreatedIndex]));
-        inputMap[newCreatedIndex] = ofParameter<vector<float>>();
-        addParameterToGroupAndInfo(inputMap[newCreatedIndex].set("Input " + ofToString(newCreatedIndex), {-1}, {0}, {1})).isSavePreset = false;
-        ifNewCreatedChecker[newCreatedIndex] = false;
-        listeners[newCreatedIndex] = inputMap[newCreatedIndex].newListener([&, newCreatedIndex](vector<float> &val){
-            inputListener(newCreatedIndex);
-        });
-        ifNewCreatedChecker[index] = true;
-        ofNotifyEvent(parameterGroupChanged);
-    }
-    else if(inputMap[index].get()[0] == -1){
-        int removeIndex = -1;
-        for(auto param : inputMap){
-            if(param.second.get()[0] == -1 && param.first > removeIndex){
-                removeIndex = param.first;
-            }
-        }
-        parameters->remove(inputMap[removeIndex].getEscapedName());
-        parameters->remove("Output_" + ofToString(removeIndex) + "_Selector");
-        listeners.erase(removeIndex);
-        inputMap.erase(removeIndex);
-        universeMap.erase(removeIndex);
-        ifNewCreatedChecker.erase(removeIndex);
-        if(index != removeIndex){
-            ifNewCreatedChecker[index] = false;
-        }
-        ofNotifyEvent(parameterGroupChanged);
-    }else if(!isPoll){
-        unsigned char data[inputMap[index].get().size()];
-        for(int i = 0; i < inputMap[index].get().size(); i++){
-            data[i] = inputMap[index].get()[i]  * 255;
-        }
-        
-        //Unicast
-        if(universeMap[index] != 0 && universeMap[index] < nodeOptionStructs.size()){
-            nodeOptionStruct option = nodeOptionStructs[universeMap[index]-1];
-            artnet.sendDmx_by_SU(0, option.subnet, option.universe, option.ip.data(), data, 512);
-        }
-    }else{
+    //    if(inputMap[index].get()[0] != -1 && !ifNewCreatedChecker[index]){
+    //        int newCreatedIndex = -1;
+    //        for(int i = 0 ; newCreatedIndex == -1 ; i++){
+    //            if(inputMap.count(i) == 0){
+    //                newCreatedIndex = i;
+    //            }
+    //        }
+    //        universeMap[newCreatedIndex] = ofParameter<int>();
+    //        parameters->add(createDropdownAbstractParameter("Output " + ofToString(newCreatedIndex), nodeOptions, universeMap[newCreatedIndex]));
+    //        inputMap[newCreatedIndex] = ofParameter<vector<float>>();
+    //        addParameterToGroupAndInfo(inputMap[newCreatedIndex].set("Input " + ofToString(newCreatedIndex), {-1}, {0}, {1})).isSavePreset = false;
+    //        ifNewCreatedChecker[newCreatedIndex] = false;
+    //        listeners[newCreatedIndex] = inputMap[newCreatedIndex].newListener([&, newCreatedIndex](vector<float> &val){
+    //            inputListener(newCreatedIndex);
+    //        });
+    //        ifNewCreatedChecker[index] = true;
+    //        ofNotifyEvent(parameterGroupChanged);
+    //    }
+    //    else if(inputMap[index].get()[0] == -1){
+    //        int removeIndex = -1;
+    //        for(auto param : inputMap){
+    //            if(param.second.get()[0] == -1 && param.first > removeIndex){
+    //                removeIndex = param.first;
+    //            }
+    //        }
+    //        parameters->remove(inputMap[removeIndex].getEscapedName());
+    //        parameters->remove("Output_" + ofToString(removeIndex) + "_Selector");
+    //        listeners.erase(removeIndex);
+    //        inputMap.erase(removeIndex);
+    //        universeMap.erase(removeIndex);
+    //        ifNewCreatedChecker.erase(removeIndex);
+    //        if(index != removeIndex){
+    //            ifNewCreatedChecker[index] = false;
+    //        }
+    //        ofNotifyEvent(parameterGroupChanged);
+    //    }else
+    if(isPoll){
         for(int i = 0 ; parameters->contains("Output " + ofToString(i) + " Selector"); i++){
             string optionsString;
             for(auto opt : nodeOptions){
@@ -107,6 +101,20 @@ void artnetSender::inputListener(int index){
             ofNotifyEvent(dropdownChanged, name);
         }
         isPoll = false;
+    }
+    else if(inputMap[index].get()[0] != -1){
+        //        unsigned char data[inputMap[index].get().size()];
+        vector<unsigned char> data;
+        data.resize(255, 0);
+        for(int i = 0; i < inputMap[index].get().size(); i++){
+            data[i] = inputMap[index].get()[i]  * 255;
+        }
+        
+        //Unicast
+        if(universeMap[index] != 0 && universeMap[index] < nodeOptionStructs.size()){
+            nodeOptionStruct option = nodeOptionStructs[universeMap[index]-1];
+            artnet.sendDmx_by_SU(0, option.subnet, option.universe, option.ip.data(), data.data(), 512);
+        }
     }
 }
 
@@ -144,16 +152,16 @@ void artnetSender::receivePollReply(ofxArtNetNodeEntry &node){
         cout<<node.getUniverseOutput(i)%16<<"-";
     }
     cout<<endl;
-//    for(int i = 0 ; parameters->contains("Output " + ofToString(i) + " Selector"); i++){
-//        string optionsString;
-//        for(auto opt : nodeOptions){
-//            optionsString += opt + "-|-";
-//        }
-//        optionsString.erase(optionsString.end()-3, optionsString.end());
-//        string name = "Output " + ofToString(i) + " Selector";
-//        parameters->getGroup(name).getString(0).set(optionsString);
-//        parameters->getGroup(name).getInt(1).setMax(nodeOptions.size());
-//        ofNotifyEvent(dropdownChanged, name);
-//    }
+    //    for(int i = 0 ; parameters->contains("Output " + ofToString(i) + " Selector"); i++){
+    //        string optionsString;
+    //        for(auto opt : nodeOptions){
+    //            optionsString += opt + "-|-";
+    //        }
+    //        optionsString.erase(optionsString.end()-3, optionsString.end());
+    //        string name = "Output " + ofToString(i) + " Selector";
+    //        parameters->getGroup(name).getString(0).set(optionsString);
+    //        parameters->getGroup(name).getInt(1).setMax(nodeOptions.size());
+    //        ofNotifyEvent(dropdownChanged, name);
+    //    }
 }
 

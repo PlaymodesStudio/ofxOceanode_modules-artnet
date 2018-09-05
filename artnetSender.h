@@ -27,12 +27,12 @@ public:
     void setup() override;
     
     virtual void presetSave(ofJson &json) override{
-        vector<int> indexs;
-        for(auto param : universeMap) indexs.push_back(param.first);
-        json["Inputs"] = indexs;
+        //        vector<int> indexs;
+        //        for(auto param : universeMap) indexs.push_back(param.first);
+        //        json["Inputs"] = indexs;
         
         vector<string> outputNode;
-        outputNode.resize(*max_element(indexs.begin(), indexs.end())+1);
+        outputNode.resize(inputMap.size());
         for(auto param : universeMap){
             outputNode[param.first] = nodeOptions[param.second];
         }
@@ -40,45 +40,51 @@ public:
     }
     
     virtual void presetRecallBeforeSettingParameters(ofJson &json) override{
-        if(json.count("Inputs") == 1){
-            vector<int> indexs = json["Inputs"];
-           
-            for(auto param : inputMap){
-                parameters->remove(param.second.getEscapedName());
-                parameters->remove("Output_" + ofToString(param.first) + "_Selector");
-                listeners.erase(param.first);
-                ifNewCreatedChecker.erase(param.first);
-            }
-            for(auto param : universeMap){
-                parameters->remove(param.second.getEscapedName());
-            }
-            universeMap.clear();
-            inputMap.clear();
-            ofNotifyEvent(parameterGroupChanged);
-            int maxIndex = 0;
-            for(int i : indexs){
-                universeMap[i] = ofParameter<int>();
-                addParameterToGroupAndInfo(createDropdownAbstractParameter("Output " + ofToString(i), nodeOptions, universeMap[i])).isSavePreset = false;
-                inputMap[i] = ofParameter<vector<float>>();
-                addParameterToGroupAndInfo(inputMap[i].set("Input " + ofToString(i), {-1}, {0}, {1})).isSavePreset = false;
-                ifNewCreatedChecker[i] = true;
-                listeners[i] = inputMap[i].newListener([&, i](vector<float> &val){
-                    inputListener(i);
-                });
-                if(i > maxIndex) maxIndex = i;
-            }
-            ofNotifyEvent(parameterGroupChanged);
-            ifNewCreatedChecker[maxIndex] = false;
-            
-            if(json.count("outputNode") == 1){
-                vector<string> outputNode = json["outputNode"];
-                for(auto i : indexs){
-                    ptrdiff_t pos = find(nodeOptions.begin(), nodeOptions.end(), outputNode[i]) - nodeOptions.begin();
-                    if(pos < nodeOptions.size()) {
-                        universeMap[i] = pos;
-                    }
+        //        if(json.count("Inputs") == 1){
+        //            vector<int> indexs = json["Inputs"];
+        //
+        //            for(auto param : inputMap){
+        //                parameters->remove(param.second.getEscapedName());
+        //                parameters->remove("Output_" + ofToString(param.first) + "_Selector");
+        //                listeners.erase(param.first);
+        //                ifNewCreatedChecker.erase(param.first);
+        //            }
+        //            for(auto param : universeMap){
+        //                parameters->remove(param.second.getEscapedName());
+        //            }
+        //            universeMap.clear();
+        //            inputMap.clear();
+        //            ofNotifyEvent(parameterGroupChanged);
+        //            int maxIndex = 0;
+        //            for(int i : indexs){
+        //                universeMap[i] = ofParameter<int>();
+        //                addParameterToGroupAndInfo(createDropdownAbstractParameter("Output " + ofToString(i), nodeOptions, universeMap[i])).isSavePreset = false;
+        //                inputMap[i] = ofParameter<vector<float>>();
+        //                addParameterToGroupAndInfo(inputMap[i].set("Input " + ofToString(i), {-1}, {0}, {1})).isSavePreset = false;
+        //                ifNewCreatedChecker[i] = true;
+        //                listeners[i] = inputMap[i].newListener([&, i](vector<float> &val){
+        //                    inputListener(i);
+        //                });
+        //                if(i > maxIndex) maxIndex = i;
+        //            }
+        //            ofNotifyEvent(parameterGroupChanged);
+        //            ifNewCreatedChecker[maxIndex] = false;
+        //        }
+        
+        if(json.count("outputNode") == 1){
+            vector<string> outputNode = json["outputNode"];
+            for(auto input : inputMap){
+                ptrdiff_t pos = find(nodeOptions.begin(), nodeOptions.end(), outputNode[input.first]) - nodeOptions.begin();
+                if(pos < nodeOptions.size()) {
+                    universeMap[input.first] = pos;
                 }
             }
+        }
+    }
+    
+    virtual void presetRecallAfterSettingParameters(ofJson &json) override{
+        for(auto input : inputMap){
+            input.second = {-1};
         }
     }
     
@@ -89,7 +95,7 @@ private:
     void sendArtnet(vector<float> &vf, int inputIndex);
     void sendPoll();
     void receivePollReply(ofxArtNetNodeEntry &node);
-
+    
     ofEventListeners eventListeners;
     
     ofParameter<void>   pollButton;
@@ -113,3 +119,4 @@ private:
 };
 
 #endif /* artnetSender_h */
+

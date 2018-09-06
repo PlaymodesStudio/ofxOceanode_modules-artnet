@@ -28,7 +28,7 @@ void artnetSender::setup(){
     
     eventListeners.push(artnet.pollReply.newListener(this, &artnetSender::receivePollReply));
     artnet.start();
-    sendPoll();
+    
     nodeOptions.clear();
     nodeOptions.push_back("None");
     
@@ -36,6 +36,7 @@ void artnetSender::setup(){
     parameters->add(pollButton.set("Poll Devices"));
     
     int numInputs = 4;
+    isPollPerIndex.resize(4, false);
     
     for(int i = 0; i < numInputs; i++){
         universeMap[i] = ofParameter<int>();
@@ -43,10 +44,13 @@ void artnetSender::setup(){
         inputMap[i] = ofParameter<vector<float>>();
         addParameterToGroupAndInfo(inputMap[i].set("Input " + ofToString(i), {-1}, {0}, {1})).isSavePreset = false;
         ifNewCreatedChecker[i] = true;
+    }
+    for(int i = 0; i < numInputs; i++){
         listeners[i] = inputMap[i].newListener([&, i](vector<float> &val){
             inputListener(i);
         });
     }
+    sendPoll();
     
     eventListeners.push(pollButton.newListener(this, &artnetSender::sendPoll));
 }
@@ -88,24 +92,24 @@ void artnetSender::inputListener(int index){
     //        }
     //        ofNotifyEvent(parameterGroupChanged);
     //    }else
-    if(isPoll){
-        for(int i = 0 ; parameters->contains("Output " + ofToString(i) + " Selector"); i++){
+    if(isPollPerIndex[index]){
+        if(parameters->contains("Output " + ofToString(index) + " Selector")){
             string optionsString;
             for(auto opt : nodeOptions){
                 optionsString += opt + "-|-";
             }
             optionsString.erase(optionsString.end()-3, optionsString.end());
-            string name = "Output " + ofToString(i) + " Selector";
+            string name = "Output " + ofToString(index) + " Selector";
             parameters->getGroup(name).getString(0).set(optionsString);
-            parameters->getGroup(name).getInt(1).setMax(nodeOptions.size());
+            parameters->getGroup(name).getInt(1).setMax(nodeOptions.size()-1);
             ofNotifyEvent(dropdownChanged, name);
         }
-        isPoll = false;
+        isPollPerIndex[index] = false;
     }
-    else if(inputMap[index].get()[0] != -1){
+    if(inputMap[index].get()[0] != -1){
         //        unsigned char data[inputMap[index].get().size()];
         vector<unsigned char> data;
-        data.resize(255, 0);
+        data.resize(512, 0);
         for(int i = 0; i < inputMap[index].get().size(); i++){
             data[i] = inputMap[index].get()[i]  * 255;
         }
@@ -121,7 +125,7 @@ void artnetSender::inputListener(int index){
 void artnetSender::sendArtnet(vector<float> &vf, int inputIndex){
     unsigned char data[vf.size()];
     for(int i = 0; i < vf.size(); i++){
-        data[i] = vf[i]  * 127;
+        data[i] = vf[i]  * 255;
     }
     
     //Unicast
@@ -144,13 +148,13 @@ void artnetSender::sendPoll(){
 };
 
 void artnetSender::receivePollReply(ofxArtNetNodeEntry &node){
-    isPoll = true;
     cout<<"NODE FOUND! " << "IP: " <<node.getIp()<< " - Subnet: "<<node.getSubnet()<<" Universes: -" ;
     for(int i = 0; i < node.getPortCount(); i++){
         nodeOptionStructs.push_back(nodeOptionStruct(node.getSubnet(), node.getUniverseOutput(i)%16, node.getIp()));
         nodeOptions.push_back("Sub:" + ofToString(node.getSubnet()) + " Univ:" + ofToString(node.getUniverseOutput(i)%16) + " IP:" + node.getIp());
         cout<<node.getUniverseOutput(i)%16<<"-";
     }
+    std::fill(isPollPerIndex.begin(), isPollPerIndex.end(), true);
     cout<<endl;
     //    for(int i = 0 ; parameters->contains("Output " + ofToString(i) + " Selector"); i++){
     //        string optionsString;

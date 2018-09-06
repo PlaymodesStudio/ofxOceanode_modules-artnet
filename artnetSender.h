@@ -116,6 +116,7 @@ private:
     vector<nodeOptionStruct> nodeOptionStructs;
     
     bool isPoll;
+    vector<bool> isPollPerIndex;
 };
 
 #endif /* artnetSender_h */

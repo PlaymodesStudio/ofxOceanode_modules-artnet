@@ -115,7 +115,7 @@ void artnetSender::inputListener(int index){
         }
         
         //Unicast
-        if(universeMap[index] != 0 && universeMap[index] < nodeOptionStructs.size()){
+        if(universeMap[index] != 0 && universeMap[index] < (nodeOptionStructs.size()+1)){
             nodeOptionStruct option = nodeOptionStructs[universeMap[index]-1];
             artnet.sendDmx_by_SU(0, option.subnet, option.universe, option.ip.data(), data.data(), 512);
         }

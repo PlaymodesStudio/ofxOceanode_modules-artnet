@@ -9,7 +9,7 @@
 #define artnetSender_h
 
 #include "ofxOceanodeNodeModel.h"
-#include "ofxArtNet.h"
+#include "ofxArtNode.h"
 
 struct nodeOptionStruct{
     int subnet;
@@ -27,10 +27,6 @@ public:
     void setup() override;
     
     virtual void presetSave(ofJson &json) override{
-        //        vector<int> indexs;
-        //        for(auto param : universeMap) indexs.push_back(param.first);
-        //        json["Inputs"] = indexs;
-        
         vector<string> outputNode;
         outputNode.resize(inputMap.size());
         for(auto param : universeMap){
@@ -40,37 +36,6 @@ public:
     }
     
     virtual void presetRecallBeforeSettingParameters(ofJson &json) override{
-        //        if(json.count("Inputs") == 1){
-        //            vector<int> indexs = json["Inputs"];
-        //
-        //            for(auto param : inputMap){
-        //                parameters->remove(param.second.getEscapedName());
-        //                parameters->remove("Output_" + ofToString(param.first) + "_Selector");
-        //                listeners.erase(param.first);
-        //                ifNewCreatedChecker.erase(param.first);
-        //            }
-        //            for(auto param : universeMap){
-        //                parameters->remove(param.second.getEscapedName());
-        //            }
-        //            universeMap.clear();
-        //            inputMap.clear();
-        //            ofNotifyEvent(parameterGroupChanged);
-        //            int maxIndex = 0;
-        //            for(int i : indexs){
-        //                universeMap[i] = ofParameter<int>();
-        //                addParameterToGroupAndInfo(createDropdownAbstractParameter("Output " + ofToString(i), nodeOptions, universeMap[i])).isSavePreset = false;
-        //                inputMap[i] = ofParameter<vector<float>>();
-        //                addParameterToGroupAndInfo(inputMap[i].set("Input " + ofToString(i), {-1}, {0}, {1})).isSavePreset = false;
-        //                ifNewCreatedChecker[i] = true;
-        //                listeners[i] = inputMap[i].newListener([&, i](vector<float> &val){
-        //                    inputListener(i);
-        //                });
-        //                if(i > maxIndex) maxIndex = i;
-        //            }
-        //            ofNotifyEvent(parameterGroupChanged);
-        //            ifNewCreatedChecker[maxIndex] = false;
-        //        }
-        
         if(json.count("outputNode") == 1){
             vector<string> outputNode = json["outputNode"];
             for(auto input : inputMap){
@@ -91,10 +56,11 @@ public:
 private:
     void inputListener(int index);
     
-    ofxArtNet artnet;
+    ofxArtNode artnet;
     void sendArtnet(vector<float> &vf, int inputIndex);
     void sendPoll();
-    void receivePollReply(ofxArtNetNodeEntry &node);
+//    void receivePollReply(ofxArtNetNodeEntry &node);
+    void newNodeReceived(ofxArtNode::NodeEntry &node);
     
     ofEventListeners eventListeners;
     
@@ -117,6 +83,8 @@ private:
     
     bool isPoll;
     vector<bool> isPollPerIndex;
+    
+    bool isLoopback;
 };
 
 #endif /* artnetSender_h */

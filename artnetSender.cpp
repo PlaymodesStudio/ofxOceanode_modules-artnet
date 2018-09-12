@@ -8,8 +8,7 @@
 #include "artnetSender.h"
 
 artnetSender::artnetSender() : ofxOceanodeNodeModel("Artnet Sender"){
-    isPoll = false;
-    isLoopback = false;
+    manualNodes = false;
 }
 
 artnetSender::~artnetSender(){
@@ -19,17 +18,16 @@ artnetSender::~artnetSender(){
 void artnetSender::setup(){
     
     artnet.setup(ofxArtNode::getInterfaceAddr(0), "255.255.255.0");
-    eventListeners.push(artnet.nodeAdded.newListener(this, &artnetSender::newNodeReceived));
+    eventListeners.push(artnet.nodeAdded.newListener(this, &artnetSender::nodeAdded));
+    eventListeners.push(artnet.nodeErased.newListener(this, &artnetSender::nodeErased));
     
     nodeOptions.clear();
+    nodeOptionStructs.clear();
     nodeOptions.push_back("None");
     
-    if(ofxArtNode::getInterfaceAddr(0) == "127.0.0.1"){ //WE ARE WORKING WITH LOOPBACK
-        isLoopback = true;
-        for(int i = 0; i < 16; i++) nodeOptions.push_back("Sub 0 : Uni "  + ofToString(i));
-    }else{
-        parameters->add(pollButton.set("Poll Devices"));
-    }
+    loadManualNodes();
+    
+    parameters->add(pollButton.set("Poll Devices"));
     
     int numInputs = 4;
     isPollPerIndex.resize(4, false);
@@ -46,9 +44,14 @@ void artnetSender::setup(){
             inputListener(i);
         });
     }
+    
     sendPoll();
     
     eventListeners.push(pollButton.newListener(this, &artnetSender::sendPoll));
+}
+
+void artnetSender::update(ofEventArgs &a){
+    artnet.update();
 }
 
 void artnetSender::inputListener(int index){
@@ -67,67 +70,76 @@ void artnetSender::inputListener(int index){
         isPollPerIndex[index] = false;
     }
     if(inputMap[index].get()[0] != -1){
-        //        unsigned char data[inputMap[index].get().size()];
-        vector<unsigned char> data;
-        data.resize(512, 0);
-        for(int i = 0; i < inputMap[index].get().size(); i++){
-            data[i] = inputMap[index].get()[i]  * 255;
-        }
-        
-        if(isLoopback && universeMap[index] != 0){
-            ArtDmx * dmx = artnet.createArtDmx(0, 0, universeMap[index]-1);
+        if(universeMap[index] != 0 && universeMap[index] < (nodeOptionStructs.size()+1)){
+            nodeOptionStruct option = nodeOptionStructs[universeMap[index]-1];
+            ArtDmx * dmx = artnet.createArtDmx(0, option.subnet, option.universe);
             for(int i = 0; i < inputMap[index].get().size(); i++){
                 dmx->Data[i] = inputMap[index]->at(i)  * 255;
             }
-            artnet.sendUniCast("127.0.0.1", 6454, (char*)dmx, dmx->getSize());
-        }
-        else if(universeMap[index] != 0 && universeMap[index] < (nodeOptionStructs.size()+1)){
-            nodeOptionStruct option = nodeOptionStructs[universeMap[index]-1];
-//            artnet.sendDmx_by_SU(0, option.subnet, option.universe, option.ip.data(), data.data(), 512);
+            artnet.sendUniCast(option.ip, 6454, (char*)dmx, dmx->getSize());
         }
     }
-}
-
-void artnetSender::sendArtnet(vector<float> &vf, int inputIndex){
-    unsigned char data[vf.size()];
-    for(int i = 0; i < vf.size(); i++){
-        data[i] = vf[i]  * 255;
-    }
-    
-    //Unicast
-    if(universeChooser[inputIndex] != 0 && universeChooser[inputIndex] < nodeOptionStructs.size()){
-        nodeOptionStruct option = nodeOptionStructs[universeChooser[inputIndex]-1];
-//        artnet.sendDmx_by_SU(0, option.subnet, option.universe, option.ip.data(), data, 512);
-    }
-    
-    //Broadcast
-    //artnet.sendDmxRaw(startSubnet*16 + startUniverse, data, 512);
 }
 
 void artnetSender::sendPoll(){
     artnet.sendPoll();
-    nodeOptions.clear();
-    nodeOptions.push_back("None");
 };
 
-//void artnetSender::receivePollReply(ofxArtNetNodeEntry &node){
-//    cout<<"NODE FOUND! " << "IP: " <<node.getIp()<< " - Subnet: "<<node.getSubnet()<<" Universes: -" ;
-//    for(int i = 0; i < node.getPortCount(); i++){
-//        nodeOptionStructs.push_back(nodeOptionStruct(node.getSubnet(), node.getUniverseOutput(i)%16, node.getIp()));
-//        nodeOptions.push_back("Sub:" + ofToString(node.getSubnet()) + " Univ:" + ofToString(node.getUniverseOutput(i)%16) + " IP:" + node.getIp());
-//        cout<<node.getUniverseOutput(i)%16<<"-";
-//    }
-//    std::fill(isPollPerIndex.begin(), isPollPerIndex.end(), true);
-//    cout<<endl;
-//}
-
-void artnetSender::newNodeReceived(ofxArtNode::NodeEntry &node){
-    cout<<"NODE FOUND! " << "IP: " <<node.address << " - Subnet: "<<node.pollReply.SubSwitch <<" Universes: -" ;
-//    for(int i = 0; i < node.getPortCount(); i++){
-//        nodeOptionStructs.push_back(nodeOptionStruct(node.getSubnet(), node.getUniverseOutput(i)%16, node.getIp()));
-//        nodeOptions.push_back("Sub:" + ofToString(node.getSubnet()) + " Univ:" + ofToString(node.getUniverseOutput(i)%16) + " IP:" + node.getIp());
-//        cout<<node.getUniverseOutput(i)%16<<"-";
-//    }
+void artnetSender::nodeAdded(ofxArtNode::NodeEntry &node){
+    if(manualNodes){
+        nodeOptionStructs.clear();
+        nodeOptions.clear();
+        nodeOptions.push_back("None");
+        manualNodes = false;
+    }
+    int subnet = int(node.pollReply.SubSwitch);
+    cout<<"NODE FOUND! " << "IP: " <<node.address << " - Subnet: "<< subnet <<" Universes: -" ;
+    for(int i = 0; i < node.pollReply.NumPortsLo; i++){
+        int universe = int(node.pollReply.SwOut[i]);
+        nodeOptionStructs.push_back(nodeOptionStruct(subnet, universe, node.address));
+        nodeOptions.push_back("Sub:" + ofToString(subnet) + " Univ:" + ofToString(universe) + " IP:" + node.address);
+        cout<<universe<<"-";
+    }
     std::fill(isPollPerIndex.begin(), isPollPerIndex.end(), true);
     cout<<endl;
+}
+
+void artnetSender::nodeErased(ofxArtNode::NodeEntry &node){
+    int subnet = int(node.pollReply.SubSwitch);
+    cout<<"NODE Erase! " << "IP: " <<node.address << " - Subnet: "<< subnet <<" Universes: -" ;
+    for(int i = 0; i < node.pollReply.NumPortsLo; i++){
+        int universe = int(node.pollReply.SwOut[i]);
+        for(int j = 0; j < nodeOptionStructs.size();){
+            if(nodeOptionStructs[j].ip == node.address && nodeOptionStructs[j].subnet == subnet && nodeOptionStructs[j].universe == universe){
+                nodeOptionStructs.erase(nodeOptionStructs.begin()+j);
+                nodeOptions.erase(nodeOptions.begin()+j+1);
+            }else{
+                j++;
+            }
+        }
+    }
+    cout<<endl;
+    if(nodeOptionStructs.size() == 0){
+        loadManualNodes();
+    }
+    std::fill(isPollPerIndex.begin(), isPollPerIndex.end(), true);
+}
+
+void artnetSender::loadManualNodes(){
+    manualNodes = true;
+    ofJson json = ofLoadJson("ArtnetManualNodes.json");
+    if(!json.empty()){
+        for (ofJson::iterator node = json.begin(); node != json.end(); ++node) {
+            string address = ofSplitString(node.key(), "-")[0];
+            string subnet = ofSplitString(node.key(), "-")[1];
+            cout<<"ManualNode! " << "IP: " << address <<  " - Subnet: "<< subnet << " Universes: -" ;
+            for (auto universe : node.value()) {
+                nodeOptionStructs.push_back(nodeOptionStruct(ofToInt(subnet), universe, address));
+                nodeOptions.push_back("Sub:" + subnet + " Univ:" + ofToString(universe) + " IP:" + address);
+                cout<<universe<<"-";
+            }
+            cout<< endl;
+        }
+    }
+    
 }

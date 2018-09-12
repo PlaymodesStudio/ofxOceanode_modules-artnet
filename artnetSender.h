@@ -25,6 +25,7 @@ public:
     ~artnetSender();
     
     void setup() override;
+    void update(ofEventArgs &a) override;
     
     virtual void presetSave(ofJson &json) override{
         vector<string> outputNode;
@@ -57,20 +58,15 @@ private:
     void inputListener(int index);
     
     ofxArtNode artnet;
-    void sendArtnet(vector<float> &vf, int inputIndex);
     void sendPoll();
-//    void receivePollReply(ofxArtNetNodeEntry &node);
-    void newNodeReceived(ofxArtNode::NodeEntry &node);
+    void nodeAdded(ofxArtNode::NodeEntry &node);
+    void nodeErased(ofxArtNode::NodeEntry &node);
+    
+    void loadManualNodes();
     
     ofEventListeners eventListeners;
     
     ofParameter<void>   pollButton;
-    vector<ofParameter<vector<float>>>  inputs;
-    ofParameter<int> startSubnet;
-    ofParameter<int> startUniverse;
-    ofParameter<string> targetIp;
-    vector<ofParameter<int>> universeChooser;
-    
     
     map<int, ofParameter<int>> universeMap;
     map<int, ofParameter<vector<float>>> inputMap;
@@ -81,10 +77,8 @@ private:
     vector<string> nodeOptions;
     vector<nodeOptionStruct> nodeOptionStructs;
     
-    bool isPoll;
+    bool manualNodes;
     vector<bool> isPollPerIndex;
-    
-    bool isLoopback;
 };
 
 #endif /* artnetSender_h */

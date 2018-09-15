@@ -16,7 +16,6 @@ artnetSender::~artnetSender(){
 }
 
 void artnetSender::setup(){
-    
     artnet.setup(ofxArtNode::getInterfaceAddr(0), "255.255.255.0");
     eventListeners.push(artnet.nodeAdded.newListener(this, &artnetSender::nodeAdded));
     eventListeners.push(artnet.nodeErased.newListener(this, &artnetSender::nodeErased));
@@ -27,6 +26,9 @@ void artnetSender::setup(){
     
     loadManualNodes();
     
+    auto info = addParameterToGroupAndInfo(ip.set("IP", ofxArtNode::getInterfaceAddr(0)));
+    info.isSavePreset = false;
+    info.isSaveProject = false;
     parameters->add(pollButton.set("Poll Devices"));
     
     int numInputs = 4;
@@ -48,6 +50,11 @@ void artnetSender::setup(){
     sendPoll();
     
     eventListeners.push(pollButton.newListener(this, &artnetSender::sendPoll));
+    eventListeners.push(ip.newListener([this](string &s){
+        if(ofSplitString(s, ".").size() == 4){
+            artnet.setup(s, "255.255.255.0");
+        }
+    }));
 }
 
 void artnetSender::update(ofEventArgs &a){

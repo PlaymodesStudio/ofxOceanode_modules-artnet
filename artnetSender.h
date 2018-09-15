@@ -68,6 +68,7 @@ private:
     
     ofParameter<void>   pollButton;
     
+    ofParameter<string> ip;
     map<int, ofParameter<int>> universeMap;
     map<int, ofParameter<vector<float>>> inputMap;
     map<int, bool> ifNewCreatedChecker;

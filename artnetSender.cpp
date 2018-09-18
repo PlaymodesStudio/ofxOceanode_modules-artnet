@@ -26,7 +26,7 @@ void artnetSender::setup(){
     
     loadManualNodes();
     
-    auto info = addParameterToGroupAndInfo(ip.set("IP", ofxArtNode::getInterfaceAddr(0)));
+    auto &info = addParameterToGroupAndInfo(ip.set("IP", ofxArtNode::getInterfaceAddr(0)));
     info.isSavePreset = false;
     info.isSaveProject = false;
     parameters->add(pollButton.set("Poll Devices"));

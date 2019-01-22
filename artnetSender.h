@@ -36,7 +36,7 @@ public:
         json["outputNode"] = outputNode;
     }
     
-    virtual void presetRecallBeforeSettingParameters(ofJson &json) override{
+    virtual void loadCustomPersistent(ofJson &json) override{
         if(json.count("outputNode") == 1){
             vector<string> outputNode = json["outputNode"];
             for(auto input : inputMap){
